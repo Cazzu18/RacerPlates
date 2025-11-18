@@ -35,5 +35,11 @@ class Rating(Base):
     __tablename__ = "ratings"
     id: Mapped[int] = mapped_column(Integer, primary_key = True, autoincrement=True)
     meal_id: Mapped[int] = mapped_column(Integer, index=True)
+    
     label_3class: Mapped[int | None] = mapped_column(Integer, nullable=True)
     stars_5: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    
+    dietary_pref: Mapped[str | None] = mapped_column(Text, nullable = True)
+    satisfaction_factor: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    comment: Mapped[str | None] = mapped_column(Text, nullable=True)
