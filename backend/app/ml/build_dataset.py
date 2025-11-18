@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 import sys
 
-# Ensure backend/app is on the Python path so `app.*` imports work
+#ensuring backend/app is on the Python path so `app.*` imports work
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
@@ -37,6 +37,8 @@ def build_training_dataframe():
         allergen_count = compute_allergen_count(meal)
         embed_vec = embed_ingredients(meal.ingredients)
         
+        full_text = f"{meal.name}. {meal.ingredients or ''}"
+        
         row = {
             "meal_id": meal.id,
             "menu_item_id": meal.menu_item_id,
@@ -44,6 +46,7 @@ def build_training_dataframe():
             "stars_5": r.stars_5,
             "dietary_pref": r.dietary_pref,
             "satisfaction_factor": r.satisfaction_factor,
+            "text": full_text,
             **numeric,
             **diet,
             "allergen_count": allergen_count,
