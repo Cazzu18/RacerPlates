@@ -33,4 +33,9 @@ class PredictIn(BaseModel):
 def predict(payload: PredictIn):
     payload_dict = payload.dict()
     pred = predict_from_payload(payload_dict)
-    return {"label": pred["label"], "probability": pred["proba"]}
+    return {
+        "label": pred["label"],
+        "probability": pred["proba"],
+        "proba_per_class": pred.get("proba_per_class"),
+        "classes": pred.get("classes"),
+    }
