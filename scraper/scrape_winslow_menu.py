@@ -40,8 +40,7 @@ def as_str(v) -> str:
     return v.strip() if isinstance(v, str) else ""
 
 def ingredients_to_str(v) -> str:
-    """Sodexo menu JSON has `ingredients` as a long string (or null).
-    Occasionally if the shape ever changes to a list, handle that too."""
+    """Sodexo menu JSON has `ingredients` as a long string (or null)."""
     if isinstance(v, str):
         return v.strip()
     if isinstance(v, list):
@@ -65,7 +64,7 @@ def allergens_to_str(v) -> str:
     return ""
 
 def derive_diet_key(item: Dict[str, Any]) -> str:
-    """Map Sodexo dietary booleans into a single label."""
+    """Mapping Sodexo dietary booleans into a single label."""
     diet_key = ["standard"]
     if item.get("isVegan"):
         if diet_key[0] == "standard":
@@ -109,7 +108,6 @@ def parse_item(item: Dict[str, Any]) -> Dict[str, Any]:
   
 def _iter_sections(raw: Any) -> Iterable[Dict[str, Any]]:
     """
-    Yield every section that has an 'items' list.
     Handles a few observed shapes:
       1) {"courseMenus": [ { "items": [...] }, ... ]}
       2) {"data": {"courseMenus": [ ... ]}}
@@ -148,7 +146,7 @@ def main():
         for group in meal_block.get("groups", []):
             for item in group.get("items", []):
                 parsed = parse_item(item)
-                parsed["meal_time"] = meal_time #override, ensures consistency
+                parsed["meal_time"] = meal_time #ensures consistency
                 items.append(parsed)
 
     if not items:

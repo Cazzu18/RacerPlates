@@ -9,6 +9,7 @@ from app.ml.features import (
     compute_allergen_count,
     compute_diet_features,
     compute_numeric_features,
+    build_embedding_text,
     embed_ingredients,
 )
 
@@ -29,6 +30,8 @@ def _load_fusion_model():
 
 class _MealLike:
     def __init__(self, payload: Dict[str, Any]) -> None:
+        self.name = payload.get("name") or payload.get("meal_name") or ""
+        self.ingredients = payload.get("ingredients") or ""
         self.calories = payload.get("calories")
         self.fat = payload.get("fat")
         self.sugar = payload.get("sugar")
@@ -42,6 +45,10 @@ class _MealLike:
         self.potassium = payload.get("potassium")
         self.diet_key = payload.get("diet_key") or ""
         self.allergens = payload.get("allergens") or ""
+        self.is_vegan = bool(payload.get("is_vegan"))
+        self.is_vegetarian = bool(payload.get("is_vegetarian"))
+        self.is_mindful = bool(payload.get("is_mindful"))
+        self.is_plant_based = bool(payload.get("is_plant_based"))
 
 
 NUMERIC_COLS: List[str] = [
@@ -57,6 +64,29 @@ NUMERIC_COLS: List[str] = [
     "calcium",
     "potassium",
     "allergen_count",
+    "protein_per_calorie",
+    "sugar_to_carb_ratio",
+    "protein_to_carb_ratio",
+    "fat_to_carb_ratio",
+    "fiber_to_carb_ratio",
+    "sodium_per_calorie",
+    "sugar_per_calorie",
+    "macro_density",
+    "log_sodium",
+    "log_sugar",
+    "log_calories",
+    "missing_nutrition",
+    "calories_missing",
+    "fat_missing",
+    "sugar_missing",
+    "protein_missing",
+    "carbohydrates_missing",
+    "sodium_missing",
+    "fiber_missing",
+    "cholesterol_missing",
+    "iron_missing",
+    "calcium_missing",
+    "potassium_missing",
 ]
 
 DIET_FLAG_COLS: List[str] = [
@@ -76,7 +106,12 @@ def _build_feature_frame(payload: Dict[str, Any]) -> pd.DataFrame:
     allergen_count = compute_allergen_count(meal)
     numeric["allergen_count"] = allergen_count
 
-    text = payload.get("ingredients") or ""
+    text = build_embedding_text(
+        name=meal.name,
+        ingredients=meal.ingredients,
+        diet_key=meal.diet_key,
+        allergens=meal.allergens,
+    )
     emb_vec = embed_ingredients(text)
     embed_cols = [f"emb_{i}" for i in range(len(emb_vec))]
     embed_dict = {f"emb_{i}": float(v) for i, v in enumerate(emb_vec)}
@@ -109,4 +144,3 @@ def predict_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "proba_per_class": proba.tolist(),
         "classes": [int(c) for c in classes],
     }
-
