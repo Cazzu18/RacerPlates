@@ -16,7 +16,7 @@ from app.ml.features import (
 )
 from app.ml.train_models import WeightedProbEnsemble as _WeightedProbEnsemble
 
-# Ensure the class is discoverable under legacy pickle module paths
+#ensuring the class is discoverable under legacy pickle module paths
 for module_name in ("__main__", "__mp_main__"):
     module = sys.modules.setdefault(module_name, ModuleType(module_name))
     setattr(module, "WeightedProbEnsemble", _WeightedProbEnsemble)
