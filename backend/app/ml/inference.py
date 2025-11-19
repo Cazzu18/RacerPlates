@@ -1,5 +1,7 @@
 from pathlib import Path
 from typing import Any, Dict, List
+import sys
+from types import ModuleType
 
 import joblib
 import numpy as np
@@ -12,6 +14,13 @@ from app.ml.features import (
     build_embedding_text,
     embed_ingredients,
 )
+from app.ml.train_models import WeightedProbEnsemble as _WeightedProbEnsemble
+
+# Ensure the class is discoverable under legacy pickle module paths
+for module_name in ("__main__", "__mp_main__"):
+    module = sys.modules.setdefault(module_name, ModuleType(module_name))
+    setattr(module, "WeightedProbEnsemble", _WeightedProbEnsemble)
+del module, module_name
 
 
 THIS_DIR = Path(__file__).resolve().parent

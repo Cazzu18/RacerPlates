@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { fetchMenu, predict } from "../(lib)/api";
-import type { Meal, PredictResponse, SatisfactionLabel } from "../(lib)/types";
+import { MODEL_LABELS, fetchMenu, predict } from "../(lib)/api";
+import type {
+  Meal,
+  ModelVariant,
+  PredictResponse,
+  SatisfactionLabel,
+} from "../(lib)/types";
 
 const LABEL_TEXT: Record<SatisfactionLabel, string> = {
   0: "Dislike",
@@ -16,8 +21,14 @@ const LABEL_COLOR_BG: Record<SatisfactionLabel, string> = {
   2: "bg-green-50",
 };
 
+const MODEL_OPTIONS: ModelVariant[] = [
+  "sbert_fusion_mlp",
+  "oracle_knn_embeddings",
+];
+
 type MealWithPrediction = Meal & {
-  prediction?: PredictResponse;
+  fusionPrediction?: PredictResponse;
+  oraclePrediction?: PredictResponse;
 };
 
 export default function DashboardPage() {
@@ -28,6 +39,8 @@ export default function DashboardPage() {
   const [showVegan, setShowVegan] = useState(false);
   const [showVegetarian, setShowVegetarian] = useState(false);
   const [threshold, setThreshold] = useState(0.0);
+  const [activeModel, setActiveModel] =
+    useState<ModelVariant>("sbert_fusion_mlp");
 
   useEffect(() => {
     async function load() {
@@ -37,27 +50,44 @@ export default function DashboardPage() {
 
         const withPreds: MealWithPrediction[] = await Promise.all(
           menu.map(async (meal) => {
-            try {
-              const prediction = await predict({
-                name: meal.name,
-                ingredients: "", // not in /menu payload currently
-                calories: meal.calories ?? undefined,
-                protein: meal.protein ?? undefined,
-                fat: meal.fat ?? undefined,
-                sugar: meal.sugar ?? undefined,
-                sodium: meal.sodium ?? undefined,
-                carbohydrates: meal.carbohydrates ?? undefined,
-                fiber: meal.fiber ?? undefined,
-                diet_key: meal.diet_key,
-                meal_time: meal.meal_time ?? undefined,
-                is_vegan: meal.is_vegan,
-                is_vegetarian: meal.is_vegetarian,
-                is_mindful: meal.is_mindful,
-              });
-              return { ...meal, prediction };
-            } catch {
-              return { ...meal };
-            }
+            const payload = {
+              name: meal.name,
+              ingredients: meal.ingredients ?? "",
+              allergens: meal.allergens ?? "",
+              station: meal.station ?? "",
+              diet_key: meal.diet_key,
+              calories: meal.calories ?? undefined,
+              protein: meal.protein ?? undefined,
+              fat: meal.fat ?? undefined,
+              sugar: meal.sugar ?? undefined,
+              sodium: meal.sodium ?? undefined,
+              carbohydrates: meal.carbohydrates ?? undefined,
+              fiber: meal.fiber ?? undefined,
+              iron: meal.iron ?? undefined,
+              calcium: meal.calcium ?? undefined,
+              potassium: meal.potassium ?? undefined,
+              meal_time: meal.meal_time ?? undefined,
+              is_vegan: meal.is_vegan,
+              is_vegetarian: meal.is_vegetarian,
+              is_mindful: meal.is_mindful,
+            };
+
+            const [fusionPrediction, oraclePrediction] = await Promise.allSettled([
+              predict(payload, "sbert_fusion_mlp"),
+              predict(payload, "oracle_knn_embeddings"),
+            ]);
+
+            return {
+              ...meal,
+              fusionPrediction:
+                fusionPrediction.status === "fulfilled"
+                  ? fusionPrediction.value
+                  : undefined,
+              oraclePrediction:
+                oraclePrediction.status === "fulfilled"
+                  ? oraclePrediction.value
+                  : undefined,
+            };
           })
         );
 
@@ -80,29 +110,40 @@ export default function DashboardPage() {
     return meals.filter((m) => {
       if (showVegan && !m.is_vegan) return false;
       if (showVegetarian && !m.is_vegetarian) return false;
-      if (threshold > 0 && m.prediction) {
-        if (m.prediction.label !== 2) return false;
-        if (m.prediction.probability < threshold) return false;
+      const activePrediction =
+        activeModel === "oracle_knn_embeddings"
+          ? m.oraclePrediction
+          : m.fusionPrediction;
+      if (threshold > 0) {
+        if (!activePrediction || activePrediction.label !== 2) return false;
+        if (activePrediction.probability < threshold) return false;
       }
       return true;
     });
-  }, [meals, showVegan, showVegetarian, threshold]);
+  }, [meals, showVegan, showVegetarian, threshold, activeModel]);
 
   const topFavorites = useMemo(() => {
-    return [...meals]
-      .filter((m) => m.prediction?.label === 2)
+    const picks = meals
+      .map((meal) => {
+        const pred =
+          activeModel === "oracle_knn_embeddings"
+            ? meal.oraclePrediction
+            : meal.fusionPrediction;
+        return { meal, pred };
+      })
+      .filter((entry) => entry.pred?.label === 2)
       .sort(
-        (a, b) =>
-          (b.prediction?.probability ?? 0) - (a.prediction?.probability ?? 0)
+        (a, b) => (b.pred?.probability ?? 0) - (a.pred?.probability ?? 0)
       )
       .slice(0, 5);
-  }, [meals]);
+    return picks;
+  }, [meals, activeModel]);
 
   return (
     <main className="min-h-screen p-6 bg-slate-50">
       <div className="max-w-6xl mx-auto space-y-6">
         <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-          <div>
+          <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold mb-1">
               Interactive Menu Dashboard
             </h1>
@@ -110,6 +151,23 @@ export default function DashboardPage() {
               Browse the current menu, see predicted satisfaction for each item,
               and filter for vegan/vegetarian or high-confidence favorites.
             </p>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+              <span className="uppercase tracking-wide">Model view:</span>
+              {MODEL_OPTIONS.map((variant) => (
+                <button
+                  key={variant}
+                  className={`px-3 py-1 rounded-full border ${
+                    activeModel === variant
+                      ? "bg-black text-white border-black"
+                      : "border-slate-300 bg-white"
+                  }`}
+                  onClick={() => setActiveModel(variant)}
+                  type="button"
+                >
+                  {MODEL_LABELS[variant]}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
@@ -156,15 +214,18 @@ export default function DashboardPage() {
 
             <div className="grid gap-3">
               {filteredMeals.map((meal) => {
-                const pred = meal.prediction;
-                const label = pred?.label ?? 1;
+                const activePrediction =
+                  activeModel === "oracle_knn_embeddings"
+                    ? meal.oraclePrediction
+                    : meal.fusionPrediction;
+                const label = activePrediction?.label ?? 1;
                 const score =
-                  pred && pred.label === 2
-                    ? Math.round(pred.probability * 100)
-                    : pred && pred.label === 1
-                    ? Math.round(pred.probability * 100)
-                    : pred
-                    ? Math.round((1 - pred.probability) * 100)
+                  activePrediction && activePrediction.label === 2
+                    ? Math.round(activePrediction.probability * 100)
+                    : activePrediction && activePrediction.label === 1
+                    ? Math.round(activePrediction.probability * 100)
+                    : activePrediction
+                    ? Math.round((1 - activePrediction.probability) * 100)
                     : null;
 
                 return (
@@ -189,7 +250,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-4 text-sm">
-                      {pred ? (
+                      {activePrediction ? (
                         <>
                           <div className="text-right">
                             <div className="text-xs uppercase tracking-wide text-slate-500">
@@ -203,6 +264,16 @@ export default function DashboardPage() {
                                 Score: {score}%
                               </div>
                             )}
+                          </div>
+                          <div className="flex flex-col text-xs text-slate-600">
+                            <ModelBadge
+                              label="Fusion"
+                              prediction={meal.fusionPrediction}
+                            />
+                            <ModelBadge
+                              label="Oracle KNN"
+                              prediction={meal.oraclePrediction}
+                            />
                           </div>
                         </>
                       ) : (
@@ -234,15 +305,12 @@ export default function DashboardPage() {
                 </p>
               )}
               <ol className="space-y-2 text-sm list-decimal list-inside">
-                {topFavorites.map((meal) => (
+                {topFavorites.map(({ meal, pred }) => (
                   <li key={meal.id}>
                     <div className="flex justify-between gap-2">
                       <span>{meal.name}</span>
                       <span className="text-xs text-slate-600">
-                        {Math.round(
-                          (meal.prediction?.probability ?? 0) * 100
-                        )}
-                        % like
+                        {Math.round((pred?.probability ?? 0) * 100)}% like
                       </span>
                     </div>
                   </li>
@@ -253,5 +321,29 @@ export default function DashboardPage() {
         </section>
       </div>
     </main>
+  );
+}
+
+type ModelBadgeProps = {
+  label: string;
+  prediction?: PredictResponse;
+};
+
+function ModelBadge({ label, prediction }: ModelBadgeProps) {
+  if (!prediction) {
+    return (
+      <span className="text-slate-400">
+        {label}: <span className="font-mono">—</span>
+      </span>
+    );
+  }
+
+  const pct = Math.round(prediction.probability * 100);
+  const labelText = LABEL_TEXT[prediction.label];
+
+  return (
+    <span className="text-slate-600">
+      {label}: {labelText} ({pct}%)
+    </span>
   );
 }

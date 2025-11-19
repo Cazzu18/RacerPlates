@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { predict } from "./(lib)/api";
+import { MODEL_LABELS, predict } from "./(lib)/api";
 import type { PredictResponse, SatisfactionLabel } from "./(lib)/types";
 
 const LABEL_TEXT: Record<SatisfactionLabel, string> = {
@@ -46,13 +46,15 @@ export default function Home() {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<PredictResponse | null>(null);
+  const [fusionResult, setFusionResult] = useState<PredictResponse | null>(null);
+  const [oracleResult, setOracleResult] = useState<PredictResponse | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    setResult(null);
+    setFusionResult(null);
+    setOracleResult(null);
 
     try {
       const payload = {
@@ -70,8 +72,12 @@ export default function Home() {
         is_mindful: form.is_mindful,
       };
 
-      const prediction: PredictResponse = await predict(payload);
-      setResult(prediction);
+      const [fusionPred, oraclePred] = await Promise.all([
+        predict(payload, "sbert_fusion_mlp"),
+        predict(payload, "oracle_knn_embeddings"),
+      ]);
+      setFusionResult(fusionPred);
+      setOracleResult(oraclePred);
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
@@ -82,9 +88,6 @@ export default function Home() {
       setLoading(false);
     }
   }
-
-  const classes = result?.classes ?? [0, 1, 2];
-  const proba = result?.proba_per_class ?? [];
 
   return (
     <main className="min-h-screen p-6 flex flex-col items-center bg-slate-50">
@@ -276,66 +279,97 @@ export default function Home() {
 
         <section className="space-y-4">
           <h2 className="text-lg font-semibold mb-2">Prediction</h2>
-          {!result && (
+          {!fusionResult && !oracleResult && (
             <p className="text-sm text-slate-600">
-              Fill in the form and click Predict to see the model&apos;s
-              estimate.
+              Fill in the form and click Predict to see model estimates.
             </p>
           )}
 
-          {result && (
-            <div className="space-y-4">
-              <div
-                className={`border rounded-lg p-4 ${LABEL_COLOR[result.label]}`}
-              >
-                <div className="text-xs font-semibold uppercase tracking-wide mb-1">
-                  Predicted satisfaction
-                </div>
-                <div className="text-2xl font-bold mb-1">
-                  {LABEL_TEXT[result.label]}
-                </div>
-                <div className="text-sm opacity-80">
-                  Confidence: {(result.probability * 100).toFixed(1)}%
-                </div>
-              </div>
-
-              {proba.length === 3 && (
-                <div className="border rounded-lg p-4">
-                  <div className="text-xs font-semibold uppercase tracking-wide mb-2">
-                    Class probabilities
-                  </div>
-                  <div className="space-y-2 text-sm">
-                    {classes.map((c, idx) => {
-                      const pct = proba[idx] * 100;
-                      const label = LABEL_TEXT[c as SatisfactionLabel];
-                      const barColor =
-                        c === 2
-                          ? "bg-green-500"
-                          : c === 1
-                          ? "bg-gray-400"
-                          : "bg-red-500";
-                      return (
-                        <div key={c}>
-                          <div className="flex justify-between mb-1">
-                            <span>{label}</span>
-                            <span>{pct.toFixed(1)}%</span>
-                          </div>
-                          <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                              className={`${barColor} h-full`}
-                              style={{ width: `${Math.max(pct, 2)}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="grid gap-4">
+            <ModelPredictionCard
+              loading={loading}
+              title={MODEL_LABELS.sbert_fusion_mlp}
+              result={fusionResult}
+            />
+            <ModelPredictionCard
+              loading={loading}
+              title={MODEL_LABELS.oracle_knn_embeddings}
+              result={oracleResult}
+            />
+          </div>
         </section>
       </div>
     </main>
+  );
+}
+
+type ModelPredictionCardProps = {
+  title: string;
+  result: PredictResponse | null;
+  loading: boolean;
+};
+
+function ModelPredictionCard({
+  title,
+  result,
+  loading,
+}: ModelPredictionCardProps) {
+  const classes = result?.classes ?? [0, 1, 2];
+  const proba = result?.proba_per_class ?? [];
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3 bg-white shadow-sm">
+      <div className="flex items-center justify-between">
+        <span className="text-xs uppercase tracking-wide text-slate-500">
+          {title}
+        </span>
+        {!result && loading && (
+          <span className="text-xs text-slate-400">Predicting...</span>
+        )}
+      </div>
+      {result ? (
+        <>
+          <div className={`rounded-lg p-3 ${LABEL_COLOR[result.label]}`}>
+            <div className="text-xs font-semibold uppercase tracking-wide mb-1">
+              Predicted satisfaction
+            </div>
+            <div className="text-xl font-bold mb-1">
+              {LABEL_TEXT[result.label]}
+            </div>
+            <div className="text-sm opacity-80">
+              Confidence: {(result.probability * 100).toFixed(1)}%
+            </div>
+          </div>
+          {proba.length === 3 && (
+            <div className="space-y-2 text-sm">
+              {classes.map((c, idx) => {
+                const pct = proba[idx] * 100;
+                const label = LABEL_TEXT[c as SatisfactionLabel];
+                const barColor =
+                  c === 2 ? "bg-green-500" : c === 1 ? "bg-gray-400" : "bg-red-500";
+                return (
+                  <div key={c}>
+                    <div className="flex justify-between mb-1">
+                      <span>{label}</span>
+                      <span>{pct.toFixed(1)}%</span>
+                    </div>
+                    <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className={`${barColor} h-full`}
+                        style={{ width: `${Math.max(pct, 3)}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      ) : (
+        <p className="text-sm text-slate-500">
+          {loading ? "Waiting for server..." : "No prediction yet"}
+        </p>
+      )}
+    </div>
   );
 }
