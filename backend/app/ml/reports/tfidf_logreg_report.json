@@ -1,0 +1,55 @@
+{
+  "name": "tfidf_logreg",
+  "accuracy": 0.34545454545454546,
+  "macro_f1": 0.30747200356707993,
+  "classification_report": {
+    "0": {
+      "precision": 0.3,
+      "recall": 0.25,
+      "f1-score": 0.2727272727272727,
+      "support": 12.0
+    },
+    "1": {
+      "precision": 0.15,
+      "recall": 0.2727272727272727,
+      "f1-score": 0.1935483870967742,
+      "support": 11.0
+    },
+    "2": {
+      "precision": 0.52,
+      "recall": 0.40625,
+      "f1-score": 0.45614035087719296,
+      "support": 32.0
+    },
+    "accuracy": 0.34545454545454546,
+    "macro avg": {
+      "precision": 0.3233333333333333,
+      "recall": 0.3096590909090909,
+      "f1-score": 0.30747200356707993,
+      "support": 55.0
+    },
+    "weighted avg": {
+      "precision": 0.398,
+      "recall": 0.34545454545454546,
+      "f1-score": 0.3636045592520357,
+      "support": 55.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      3,
+      4,
+      5
+    ],
+    [
+      1,
+      3,
+      7
+    ],
+    [
+      6,
+      13,
+      13
+    ]
+  ]
+}

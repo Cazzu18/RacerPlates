@@ -4,6 +4,7 @@ from app.ml.inference import predict_from_payload
 
 router = APIRouter()
 
+
 class PredictIn(BaseModel):
     menu_item_id: int | None = None
     name: str
@@ -25,9 +26,11 @@ class PredictIn(BaseModel):
     meal_time: str | None = None
     is_vegan: bool = False
     is_vegetarian: bool = False
-    is_mindful:  bool = False
-    
+    is_mindful: bool = False
+
+
 @router.post("/")
 def predict(payload: PredictIn):
-    pred = predict_from_payload(payload.model_dump()) #model_dump generaet a dictionary representation of the model
-    return {"label": pred["label"], "probability": ["proba"]}
+    payload_dict = payload.dict()
+    pred = predict_from_payload(payload_dict)
+    return {"label": pred["label"], "probability": pred["proba"]}
