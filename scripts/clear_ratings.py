@@ -11,7 +11,7 @@ from app.db.models import Rating
 
 def main():
     session = SessionLocal()
-    deleted = session.query(Rating).delete()  #DELETE FROM ratings;
+    deleted = session.query(Rating).delete() #DELETE FROM ratings;
     session.commit()
     session.close()
     print(f"Deleted {deleted} rating rows.")
