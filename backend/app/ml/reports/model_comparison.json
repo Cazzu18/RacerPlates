@@ -1,0 +1,27 @@
+[
+  {
+    "name": "majority_baseline",
+    "accuracy": 0.5818181818181818,
+    "macro_f1": 0.24521072796934865
+  },
+  {
+    "name": "nutrition_logreg",
+    "accuracy": 0.38181818181818183,
+    "macro_f1": 0.3590515043345232
+  },
+  {
+    "name": "tfidf_logreg",
+    "accuracy": 0.34545454545454546,
+    "macro_f1": 0.30747200356707993
+  },
+  {
+    "name": "oracle_knn_embeddings",
+    "accuracy": 0.34545454545454546,
+    "macro_f1": 0.2741508789895886
+  },
+  {
+    "name": "sbert_fusion_mlp",
+    "accuracy": 0.5454545454545454,
+    "macro_f1": 0.31962025316455694
+  }
+]

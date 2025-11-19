@@ -1,0 +1,55 @@
+{
+  "name": "nutrition_logreg",
+  "accuracy": 0.38181818181818183,
+  "macro_f1": 0.3590515043345232,
+  "classification_report": {
+    "0": {
+      "precision": 0.375,
+      "recall": 0.25,
+      "f1-score": 0.3,
+      "support": 12.0
+    },
+    "1": {
+      "precision": 0.23076923076923078,
+      "recall": 0.5454545454545454,
+      "f1-score": 0.32432432432432434,
+      "support": 11.0
+    },
+    "2": {
+      "precision": 0.5714285714285714,
+      "recall": 0.375,
+      "f1-score": 0.4528301886792453,
+      "support": 32.0
+    },
+    "accuracy": 0.38181818181818183,
+    "macro avg": {
+      "precision": 0.3923992673992674,
+      "recall": 0.39015151515151514,
+      "f1-score": 0.3590515043345232,
+      "support": 55.0
+    },
+    "weighted avg": {
+      "precision": 0.46043956043956047,
+      "recall": 0.38181818181818183,
+      "f1-score": 0.393784247369153,
+      "support": 55.0
+    }
+  },
+  "confusion_matrix": [
+    [
+      3,
+      4,
+      5
+    ],
+    [
+      1,
+      6,
+      4
+    ],
+    [
+      4,
+      16,
+      12
+    ]
+  ]
+}
