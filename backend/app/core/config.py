@@ -2,7 +2,7 @@ from pydantic import BaseSettings
 from typing import List
 from pathlib import Path
 
-#Project root directory (three levels above `backend/app/core`)
+#project root directory (three levels above `backend/app/core`)
 BASE_DIR = Path(__file__).resolve().parents[3]
 DEFAULT_SQLITE_PATH = BASE_DIR / "backend" / "app" / "db" / "db.sqlite3"
 
@@ -19,5 +19,5 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 
-# Singleton settings instance used across the app
+#singleton settings instance used across the app
 settings = Settings()

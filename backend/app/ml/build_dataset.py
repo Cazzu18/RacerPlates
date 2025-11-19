@@ -15,6 +15,7 @@ from app.ml.features import (
     compute_numeric_features,
     compute_diet_features,
     compute_allergen_count,
+    build_embedding_text,
     embed_ingredients,
 )
 
@@ -35,9 +36,13 @@ def build_training_dataframe():
         numeric = compute_numeric_features(meal)
         diet = compute_diet_features(meal)
         allergen_count = compute_allergen_count(meal)
-        embed_vec = embed_ingredients(meal.ingredients)
-        
-        full_text = f"{meal.name}. {meal.ingredients or ''}"
+        full_text = build_embedding_text(
+            name=meal.name or "",
+            ingredients=meal.ingredients or "",
+            diet_key=meal.diet_key or "",
+            allergens=meal.allergens or "",
+        )
+        embed_vec = embed_ingredients(full_text)
         
         row = {
             "meal_id": meal.id,

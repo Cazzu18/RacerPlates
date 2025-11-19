@@ -2,7 +2,7 @@ import json
 import sys
 from pathlib import Path
 
-#Ensure backend/app is on the Python path so `app.*` imports work
+#ensuring backend/app is on the Python path so `app.*` imports work
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
@@ -28,7 +28,7 @@ def upsert_meals(session, meal_dict):
     )
     
     if existing:
-        #update existing record
+        #updating existing record
         for k, v in meal_dict.items():
             setattr(existing,k, v)
     
