@@ -90,7 +90,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen p-6 flex flex-col items-center bg-slate-50">
+    <main className="min-h-screen px-6 pb-6 pt-16 flex flex-col items-center">
       <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8">
         <section>
           <h1 className="text-3xl font-semibold mb-2">
@@ -98,12 +98,12 @@ export default function Home() {
           </h1>
           <p className="text-sm text-slate-600 mb-6">
             Enter a meal and see whether students are likely to dislike,
-            feel neutral, or like it—based on your trained model.
+            feel neutral, or like it, based on your trained model!
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Meal name</label>
+              <label className="block text-sm font-medium mb-1">Dish Name </label>
               <input
                 className="w-full border rounded px-3 py-2 text-sm"
                 value={form.name}

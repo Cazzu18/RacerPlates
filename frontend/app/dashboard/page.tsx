@@ -140,7 +140,7 @@ export default function DashboardPage() {
   }, [meals, activeModel]);
 
   return (
-    <main className="min-h-screen p-6 bg-slate-50">
+    <main className="min-h-screen px-6 pb-6 pt-16">
       <div className="max-w-6xl mx-auto space-y-6">
         <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div className="flex flex-col gap-3">
