@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { MODEL_LABELS, predict } from "./(lib)/api";
 import type { PredictResponse, SatisfactionLabel } from "./(lib)/types";
@@ -90,20 +91,30 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen p-6 flex flex-col items-center bg-slate-50">
-      <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8">
-        <section>
-          <h1 className="text-3xl font-semibold mb-2">
-            Meal Satisfaction Predictor
-          </h1>
-          <p className="text-sm text-slate-600 mb-6">
-            Enter a meal and see whether students are likely to dislike,
-            feel neutral, or like it—based on your trained model.
+    <main className="min-h-screen px-6 pb-10 pt-20 flex flex-col items-center">
+      <div className="w-full max-w-5xl grid md:grid-cols-2 gap-10">
+        <section className="space-y-3">
+          <Link
+            href="/dashboard"
+            className="inline-flex justify-center rounded-md border border-black bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-900 w-full sm:w-auto"
+          >
+            View Dashboard
+          </Link>
+          <div>
+            <h1 className="text-3xl font-semibold mb-1">Meal Satisfaction Predictor</h1>
+            <p className="text-sm text-slate-600">
+              Enter a meal and see whether students are likely to dislike, feel neutral, or like it,
+              based on your trained model!
+            </p>
+          </div>
+          <p className="text-xs text-slate-500 mt-3">
+            Want to see predictions for today&apos;s dining hall menu? Head to
+            the dashboard.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Meal name</label>
+              <label className="block text-sm font-medium mb-1">Dish Name </label>
               <input
                 className="w-full border rounded px-3 py-2 text-sm"
                 value={form.name}
