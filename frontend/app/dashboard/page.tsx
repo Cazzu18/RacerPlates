@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { MODEL_LABELS, fetchMenu, predict } from "../(lib)/api";
 import type {
@@ -142,7 +143,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen px-6 pb-6 pt-16">
       <div className="max-w-6xl mx-auto space-y-6">
-        <header className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+        <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="flex flex-col gap-3">
             <h1 className="text-3xl font-semibold mb-1">
               Interactive Menu Dashboard
@@ -169,11 +170,57 @@ export default function DashboardPage() {
               ))}
             </div>
           </div>
+          <div className="flex gap-2">
+            <Link
+              href="/"
+              className="inline-flex items-center justify-center rounded-md border px-4 py-2 text-sm font-medium transition hover:bg-slate-100"
+            >
+              Meal Predictor
+            </Link>
+            <Link
+              href="/menu"
+              className="inline-flex items-center justify-center rounded-md border border-black bg-black px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-900"
+            >
+              Menu Landing
+            </Link>
+          </div>
         </header>
 
-        <section className="grid md:grid-cols-[2fr,1fr] gap-6 items-start">
-          <div className="space-y-4">
-            <div className="flex flex-wrap gap-4 items-center mb-2">
+        <section className="border rounded-lg p-4 bg-white shadow-sm space-y-3">
+          <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="font-semibold mb-1 text-sm">
+                Top 5 predicted favorites
+              </h2>
+              <p className="text-xs text-slate-600">
+                Highest-confidence picks based on the selected model.
+              </p>
+            </div>
+            <span className="text-xs text-slate-500">
+              Showing: {MODEL_LABELS[activeModel]}
+            </span>
+          </div>
+          {topFavorites.length === 0 && (
+            <p className="text-xs text-slate-600">
+              Predictions still loading or no favorites yet.
+            </p>
+          )}
+          <ol className="space-y-2 text-sm list-decimal list-inside">
+            {topFavorites.map(({ meal, pred }) => (
+              <li key={meal.id}>
+                <div className="flex justify-between gap-2">
+                  <span>{meal.name}</span>
+                  <span className="text-xs text-slate-600">
+                    {Math.round((pred?.probability ?? 0) * 100)}% like
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+
+        <section className="space-y-4">
+          <div className="flex flex-wrap gap-4 items-center mb-2">
               <label className="inline-flex items-center gap-2 text-sm">
                 <input
                   type="checkbox"
@@ -203,121 +250,91 @@ export default function DashboardPage() {
                   <option value={0.85}>85%</option>
                 </select>
               </div>
-            </div>
-
-            {loading && (
-              <p className="text-sm text-slate-600">Loading menu...</p>
-            )}
-            {error && (
-              <p className="text-sm text-red-600">Error: {error}</p>
-            )}
-
-            <div className="grid gap-3">
-              {filteredMeals.map((meal) => {
-                const activePrediction =
-                  activeModel === "oracle_knn_embeddings"
-                    ? meal.oraclePrediction
-                    : meal.fusionPrediction;
-                const label = activePrediction?.label ?? 1;
-                const score =
-                  activePrediction && activePrediction.label === 2
-                    ? Math.round(activePrediction.probability * 100)
-                    : activePrediction && activePrediction.label === 1
-                    ? Math.round(activePrediction.probability * 100)
-                    : activePrediction
-                    ? Math.round((1 - activePrediction.probability) * 100)
-                    : null;
-
-                return (
-                  <div
-                    key={meal.id}
-                    className={`border rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${LABEL_COLOR_BG[label as SatisfactionLabel]}`}
-                  >
-                    <div>
-                      <div className="font-medium text-sm">{meal.name}</div>
-                      <div className="text-xs text-slate-600 mt-1">
-                        {meal.station && <span>{meal.station} · </span>}
-                        {meal.calories != null && (
-                          <span>{meal.calories} kcal · </span>
-                        )}
-                        <span>
-                          {meal.protein ?? "?"}g protein,{" "}
-                          {meal.fat ?? "?"}g fat, {meal.sugar ?? "?"}g sugar
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {meal.diet_key}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      {activePrediction ? (
-                        <>
-                          <div className="text-right">
-                            <div className="text-xs uppercase tracking-wide text-slate-500">
-                              Predicted
-                            </div>
-                            <div className="font-semibold">
-                              {LABEL_TEXT[label as SatisfactionLabel]}
-                            </div>
-                            {score != null && (
-                              <div className="text-xs text-slate-600">
-                                Score: {score}%
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col text-xs text-slate-600">
-                            <ModelBadge
-                              label="Fusion"
-                              prediction={meal.fusionPrediction}
-                            />
-                            <ModelBadge
-                              label="Oracle KNN"
-                              prediction={meal.oraclePrediction}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="text-xs text-slate-500">
-                          Prediction unavailable
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {!loading && !error && filteredMeals.length === 0 && (
-                <p className="text-sm text-slate-600">
-                  No meals match the current filters.
-                </p>
-              )}
-            </div>
           </div>
 
-          <aside className="space-y-3">
-            <div className="border rounded-lg p-4 bg-white shadow-sm">
-              <h2 className="font-semibold mb-2 text-sm">
-                Top 5 predicted favorites
-              </h2>
-              {topFavorites.length === 0 && (
-                <p className="text-xs text-slate-600">
-                  Predictions still loading or no favorites yet.
-                </p>
-              )}
-              <ol className="space-y-2 text-sm list-decimal list-inside">
-                {topFavorites.map(({ meal, pred }) => (
-                  <li key={meal.id}>
-                    <div className="flex justify-between gap-2">
-                      <span>{meal.name}</span>
-                      <span className="text-xs text-slate-600">
-                        {Math.round((pred?.probability ?? 0) * 100)}% like
+          {loading && <p className="text-sm text-slate-600">Loading menu...</p>}
+          {error && <p className="text-sm text-red-600">Error: {error}</p>}
+
+          <div className="grid gap-3">
+            {filteredMeals.map((meal) => {
+              const activePrediction =
+                activeModel === "oracle_knn_embeddings"
+                  ? meal.oraclePrediction
+                  : meal.fusionPrediction;
+              const label = activePrediction?.label ?? 1;
+              const score =
+                activePrediction && activePrediction.label === 2
+                  ? Math.round(activePrediction.probability * 100)
+                  : activePrediction && activePrediction.label === 1
+                  ? Math.round(activePrediction.probability * 100)
+                  : activePrediction
+                  ? Math.round((1 - activePrediction.probability) * 100)
+                  : null;
+
+              return (
+                <div
+                  key={meal.id}
+                  className={`border rounded-lg p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-3 ${LABEL_COLOR_BG[label as SatisfactionLabel]}`}
+                >
+                  <div>
+                    <div className="font-medium text-sm">{meal.name}</div>
+                    <div className="text-xs text-slate-600 mt-1">
+                      {meal.station && <span>{meal.station} · </span>}
+                      {meal.calories != null && (
+                        <span>{meal.calories} kcal · </span>
+                      )}
+                      <span>
+                        {meal.protein ?? "?"}g protein,{" "}
+                        {meal.fat ?? "?"}g fat, {meal.sugar ?? "?"}g sugar
                       </span>
                     </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </aside>
+                    <div className="text-xs text-slate-500 mt-1">
+                      {meal.diet_key}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    {activePrediction ? (
+                      <>
+                        <div className="text-right">
+                          <div className="text-xs uppercase tracking-wide text-slate-500">
+                            Predicted
+                          </div>
+                          <div className="font-semibold">
+                            {LABEL_TEXT[label as SatisfactionLabel]}
+                          </div>
+                          {score != null && (
+                            <div className="text-xs text-slate-600">
+                              Score: {score}%
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col text-xs text-slate-600">
+                          <ModelBadge
+                            label="Fusion"
+                            prediction={meal.fusionPrediction}
+                          />
+                          <ModelBadge
+                            label="Oracle KNN"
+                            prediction={meal.oraclePrediction}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-xs text-slate-500">
+                        Prediction unavailable
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            {!loading && !error && filteredMeals.length === 0 && (
+              <p className="text-sm text-slate-600">
+                No meals match the current filters.
+              </p>
+            )}
+          </div>
         </section>
       </div>
     </main>

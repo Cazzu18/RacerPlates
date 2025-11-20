@@ -3,7 +3,16 @@
 :root {
   color-scheme: light;
   --background: #f9f8f8;
-  --foreground: #fffefe;
+  --foreground: #111827;
+  --font-base: var(
+    --font-geist-sans,
+    "Inter",
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif
+  );
 }
 
 @theme inline {
@@ -16,9 +25,48 @@
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --background: #c6dbda;
+    --background: #020617;
     --foreground: #f8fafc;
   }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f9f8f8;
+  --foreground: #111827;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #020617;
+  --foreground: #f8fafc;
+}
+
+:root[data-font="sans"] {
+  --font-base: var(
+    --font-geist-sans,
+    "Inter",
+    "Segoe UI",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Helvetica Neue",
+    sans-serif
+  );
+}
+
+:root[data-font="serif"] {
+  --font-base: "Times New Roman", Georgia, serif;
+}
+
+:root[data-font="mono"] {
+  --font-base: var(
+    --font-geist-mono,
+    "SFMono-Regular",
+    "Menlo",
+    "Consolas",
+    "Liberation Mono",
+    monospace
+  );
 }
 
 html,
@@ -28,5 +76,5 @@ body {
 }
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-base);
 }
