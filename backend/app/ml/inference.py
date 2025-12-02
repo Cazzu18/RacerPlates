@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import sys
 from types import ModuleType
+import logging
 
 import joblib
 import numpy as np
@@ -26,15 +27,66 @@ del module, module_name
 THIS_DIR = Path(__file__).resolve().parent
 MODELS_DIR = THIS_DIR / "models"
 FUSION_MODEL_PATH = MODELS_DIR / "sbert_fusion_mlp.joblib"
+ORACLE_MODEL_PATH = MODELS_DIR / "oracle_knn_embeddings.joblib"
 
-_fusion_model = None
+DEFAULT_MODEL_NAME = "sbert_fusion_mlp"
+MODEL_PATHS: Dict[str, Path] = {
+    "sbert_fusion_mlp": FUSION_MODEL_PATH,
+    "oracle_knn_embeddings": ORACLE_MODEL_PATH,
+}
+
+# supporting a few friendly aliases for the frontend fallbacks
+MODEL_ALIASES: Dict[str, str] = {
+    "sbert_fusion_mlp": "sbert_fusion_mlp",
+    "fusion": "sbert_fusion_mlp",
+    "fusion_mlp": "sbert_fusion_mlp",
+    "oracle_knn_embeddings": "oracle_knn_embeddings",
+    "oracle-knn": "oracle_knn_embeddings",
+    "oracle_knn": "oracle_knn_embeddings",
+    "knn": "oracle_knn_embeddings",
+}
+
+_model_cache: Dict[str, Any] = {}
+logger = logging.getLogger(__name__)
 
 
-def _load_fusion_model():
-    global _fusion_model
-    if _fusion_model is None:
-        _fusion_model = joblib.load(FUSION_MODEL_PATH)
-    return _fusion_model
+def _resolve_model_name(name: Optional[str]) -> str:
+    if not name:
+        return DEFAULT_MODEL_NAME
+    slug = name.strip().lower()
+    canonical = MODEL_ALIASES.get(slug)
+    if not canonical:
+        raise ValueError(f"Unknown model '{name}'. Supported: {list(MODEL_PATHS)}")
+    if canonical not in MODEL_PATHS:
+        raise ValueError(f"Model '{name}' not available")
+    return canonical
+
+
+def _load_model(name: str):
+    if name in _model_cache:
+        return _model_cache[name]
+    model_path = MODEL_PATHS.get(name)
+    if not model_path or not model_path.exists():
+        raise ValueError(f"Model artifact for '{name}' is missing")
+    _model_cache[name] = joblib.load(model_path)
+    return _model_cache[name]
+
+
+def preload_models() -> None:
+    """
+    Warm up the embedder and model artifacts once at startup to avoid
+    first-request latency or device init issues.
+    """
+    try:
+        embed_ingredients("warmup")
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.warning("Embedder warmup failed: %s", exc)
+
+    for name in MODEL_PATHS:
+        try:
+            _load_model(name)
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.warning("Skipping preload for %s: %s", name, exc)
 
 
 class _MealLike:
@@ -138,8 +190,9 @@ def _build_feature_frame(payload: Dict[str, Any]) -> pd.DataFrame:
     return pd.DataFrame([row], columns=feature_cols)
 
 
-def predict_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
-    model = _load_fusion_model()
+def predict_from_payload(payload: Dict[str, Any], model_name: Optional[str] = None) -> Dict[str, Any]:
+    canonical_model = _resolve_model_name(model_name)
+    model = _load_model(canonical_model)
     X = _build_feature_frame(payload)
 
     proba = model.predict_proba(X)[0]
@@ -148,6 +201,7 @@ def predict_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     label = int(classes[best_idx])
 
     return {
+        "model": canonical_model,
         "label": label,
         "proba": float(proba[best_idx]),
         "proba_per_class": proba.tolist(),

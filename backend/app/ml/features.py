@@ -37,7 +37,8 @@ def _safe_divide(numerator: float, denominator: float) -> float:
 def get_embedder():
     global _model
     if _model is None:
-        _model = SentenceTransformer("all-mpnet-base-v2")
+        # Force CPU to avoid meta-tensor issues on MPS/accelerator backends.
+        _model = SentenceTransformer("all-mpnet-base-v2", device="cpu")
     return _model
 
 
