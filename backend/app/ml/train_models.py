@@ -78,7 +78,7 @@ def evaluate_model(name, model, X_data, y_data, cv=CV):
     return summary
 
 
-def _make_knn_pipeline(embed_cols):
+def _make_knn_pipeline(embed_cols, n_neighbors=5, metric="euclidean", weights="distance"):
     embed_transformer = ColumnTransformer(
         transformers=[
             ("emb", "passthrough", embed_cols),
@@ -94,9 +94,9 @@ def _make_knn_pipeline(embed_cols):
             (
                 "knn",
                 KNeighborsClassifier(
-                    n_neighbors=5,
-                    metric="euclidean", #on normalized vectors ~ cosine
-                    weights="distance",
+                    n_neighbors=n_neighbors,
+                    metric=metric, #on normalized vectors ~ cosine
+                    weights=weights,
                 ),
             ),
         ]
@@ -193,7 +193,7 @@ def get_feature_groups(df):
         "is_standard",
     ]
 
-    #embedding columns: emb_0 ... emb_383
+    #embedding columns: emb_0 ... emb_{n-1} from the SBERT encoder
     embed_cols = [c for c in df.columns if c.startswith("emb_")]
 
     return numeric_cols, diet_flag_cols, embed_cols
@@ -243,7 +243,7 @@ def train_nutrition_logreg(df, X, y):
 
     return summary
 
-#term frequency-inverse diument frequency: statistical measure used to evaluate how important a word is to a document in a collection
+#term frequency-inverse document frequency: evaluates how important a word is in a corpus
 def train_tfidf_logreg(df, X, y):
     if "text" not in df.columns:
         raise ValueError(
@@ -304,7 +304,7 @@ def train_oracle_knn(df, X, y):
 
 def train_sbert_fusion_mlp(df, X, y):
     """
-    PRIMARY model(ENSAMBLE):
+    PRIMARY model (ensemble):
     - Numeric nutrition
     - Diet flags
     - Allergen count
@@ -356,16 +356,23 @@ def train_sbert_fusion_mlp(df, X, y):
     clf = ImbPipeline(
         steps=[
             ("pre", preprocessor),
+            ("scale", StandardScaler()),
             ("smote", SMOTE(random_state=42)),
             ("mlp", mlp),
         ]
     )
 
+    svd_choices = [c for c in (32, 64, 96, 128) if c < n_embed_dims]
+    if not svd_choices:
+        svd_choices = [max(1, min(128, n_embed_dims - 1))]
+
     param_grid = {
-        "mlp__hidden_layer_sizes": [(256, 128), (128, 64), (64, 32)],
-        "mlp__alpha": [1e-4, 1e-3, 1e-2],
-        "mlp__learning_rate_init": [1e-3, 5e-4],
+        "pre__emb__svd__n_components": svd_choices,
+        "mlp__hidden_layer_sizes": [(192, 96), (128, 64), (96, 48)],
+        "mlp__alpha": [1e-5, 1e-4, 1e-3, 1e-2],
+        "mlp__learning_rate_init": [5e-4, 1e-3, 2e-3],
         "mlp__batch_size": [16, 32],
+        "smote__k_neighbors": [3, 5],
     }
 
     cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
@@ -388,18 +395,123 @@ def train_sbert_fusion_mlp(df, X, y):
     print("Best params for sbert_fusion_mlp:", search.best_params_)
     print(f"Best CV macro F1: {search.best_score_:.3f}")
 
-    knn_pipeline = _make_knn_pipeline(embed_cols)
-    ensemble = WeightedProbEnsemble(
-        mlp_estimator=best_clf,
-        knn_estimator=knn_pipeline,
-        weight_mlp=0.6,
-        weight_knn=0.4,
+    #light tuning over KNN + fusion weights on top of best MLP
+    knn_space = [
+        {"n_neighbors": 3, "weights": "distance", "metric": "euclidean"},
+        {"n_neighbors": 5, "weights": "distance", "metric": "euclidean"},
+        {"n_neighbors": 7, "weights": "distance", "metric": "euclidean"},
+        {"n_neighbors": 5, "weights": "uniform", "metric": "euclidean"},
+    ]
+    fusion_weights = [(0.7, 0.3), (0.6, 0.4), (0.5, 0.5), (0.8, 0.2)]
+
+    best_combo = None
+    best_macro_f1 = -np.inf
+    best_acc = 0.0
+
+    for knn_params in knn_space:
+        knn_pipeline = _make_knn_pipeline(embed_cols, **knn_params)
+        for weight_mlp, weight_knn in fusion_weights:
+            ensemble = WeightedProbEnsemble(
+                mlp_estimator=best_clf,
+                knn_estimator=knn_pipeline,
+                weight_mlp=weight_mlp,
+                weight_knn=weight_knn,
+            )
+            y_pred = cross_val_predict(ensemble, X_f, y, cv=CV, n_jobs=-1)
+            macro_f1 = f1_score(y, y_pred, average="macro")
+            acc = accuracy_score(y, y_pred)
+            if macro_f1 > best_macro_f1:
+                best_macro_f1 = macro_f1
+                best_acc = acc
+                best_combo = (knn_params, weight_mlp, weight_knn, ensemble)
+
+    assert best_combo is not None
+    knn_params, weight_mlp, weight_knn, ensemble = best_combo
+    print(
+        "Best fusion combo:",
+        {"knn": knn_params, "weight_mlp": weight_mlp, "weight_knn": weight_knn},
     )
+    print(f"Fusion CV macro F1: {best_macro_f1:.3f} | acc: {best_acc:.3f}")
 
     summary = evaluate_model("sbert_fusion_mlp", ensemble, X_f, y)
 
     ensemble.fit(X_f, y)
     joblib.dump(ensemble, MODELS_DIR / "sbert_fusion_mlp.joblib")
+
+    return summary
+
+#just for testing purposes givven our small sample of data(MLP STILL BETTER)
+def train_sbert_fusion_linear(df, X, y):
+    """
+    Linear baseline on the same fused feature space as the MLP model.
+    """
+    numeric_cols, diet_flag_cols, embed_cols = get_feature_groups(df)
+    feature_cols = numeric_cols + diet_flag_cols + embed_cols
+
+    n_embed_dims = len(embed_cols)
+    svd_choices = [c for c in (32, 64, 96, 128) if c < n_embed_dims]
+    if not svd_choices:
+        svd_choices = [max(1, min(128, n_embed_dims - 1))]
+
+    emb_pipeline = Pipeline(
+        steps=[
+            ("norm", Normalizer(norm="l2")),
+            ("svd", TruncatedSVD(random_state=42)),
+        ]
+    )
+
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num_diet", StandardScaler(), numeric_cols + diet_flag_cols),
+            ("emb", emb_pipeline, embed_cols),
+        ],
+        remainder="drop",
+    )
+
+    logreg = LogisticRegression(
+        max_iter=2000,
+        multi_class="multinomial",
+        class_weight="balanced",
+        solver="lbfgs",
+    )
+
+    clf = ImbPipeline(
+        steps=[
+            ("pre", preprocessor),
+            ("scale", StandardScaler()),
+            ("smote", SMOTE(random_state=42)),
+            ("logreg", logreg),
+        ]
+    )
+
+    param_grid = {
+        "pre__emb__svd__n_components": svd_choices,
+        "logreg__C": [0.1, 0.5, 1.0, 3.0],
+        "smote__k_neighbors": [3, 5],
+    }
+
+    cv = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
+    search = GridSearchCV(
+        clf,
+        param_grid=param_grid,
+        scoring="f1_macro",
+        cv=cv,
+        n_jobs=-1,
+        refit=True,
+        verbose=1,
+    )
+
+    X_f = X[feature_cols]
+    search.fit(X_f, y)
+
+    best_clf = search.best_estimator_
+    print("Best params for sbert_fusion_linear:", search.best_params_)
+    print(f"Best CV macro F1 (linear): {search.best_score_:.3f}")
+
+    summary = evaluate_model("sbert_fusion_linear", best_clf, X_f, y)
+
+    best_clf.fit(X_f, y)
+    joblib.dump(best_clf, MODELS_DIR / "sbert_fusion_linear.joblib")
 
     return summary
 
@@ -431,6 +543,9 @@ def main():
 
     #5) SBERT + nutrition + diet fusion MLP
     summaries.append(train_sbert_fusion_mlp(df, X, y))
+
+    #6) SBERT + nutrition + diet fusion linear baseline
+    summaries.append(train_sbert_fusion_linear(df, X, y))
 
     #compact comparison table
     comp = [
