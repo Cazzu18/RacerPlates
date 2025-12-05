@@ -86,10 +86,11 @@ def _make_knn_pipeline(embed_cols):
         remainder="drop",
     )
 
-    return Pipeline(
+    return ImbPipeline(
         steps=[
             ("emb", embed_transformer),
             ("norm", Normalizer(norm="l2")),
+            ("smote", SMOTE(random_state=42)),
             (
                 "knn",
                 KNeighborsClassifier(
@@ -220,9 +221,10 @@ def train_nutrition_logreg(df, X, y):
         remainder="drop",
     )
 
-    clf = Pipeline(
+    clf = ImbPipeline(
         steps=[
             ("pre", preprocessor),
+            ("smote", SMOTE(random_state=42)),
             (
                 "logreg",
                 LogisticRegression(
@@ -251,7 +253,7 @@ def train_tfidf_logreg(df, X, y):
     #we'll use raw text as a series
     text = X["text"].fillna("")
 
-    clf = Pipeline(
+    clf = ImbPipeline(
         steps=[
             (
                 "tfidf",
@@ -261,6 +263,7 @@ def train_tfidf_logreg(df, X, y):
                     max_features=5000,
                 ),
             ),
+            ("smote", SMOTE(random_state=42)),
             (
                 "logreg",
                 LogisticRegression(

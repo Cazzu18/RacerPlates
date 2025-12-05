@@ -13,6 +13,8 @@ from app.ml.features import (
     compute_diet_features,
     compute_numeric_features,
     build_embedding_text,
+    build_diet_tags,
+    build_nutrition_tags,
     embed_ingredients,
 )
 from app.ml.train_models import WeightedProbEnsemble as _WeightedProbEnsemble
@@ -166,12 +168,16 @@ def _build_feature_frame(payload: Dict[str, Any]) -> pd.DataFrame:
     diet_flags = compute_diet_features(meal)
     allergen_count = compute_allergen_count(meal)
     numeric["allergen_count"] = allergen_count
+    nutrition_tags = build_nutrition_tags(numeric)
+    diet_tags = build_diet_tags(diet_flags, meal.diet_key)
 
     text = build_embedding_text(
         name=meal.name,
         ingredients=meal.ingredients,
         diet_key=meal.diet_key,
         allergens=meal.allergens,
+        nutrition_tags=nutrition_tags,
+        diet_tags=diet_tags,
     )
     emb_vec = embed_ingredients(text)
     embed_cols = [f"emb_{i}" for i in range(len(emb_vec))]

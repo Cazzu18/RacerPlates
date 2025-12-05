@@ -1,3 +1,4 @@
+from __future__ import annotations
 from sentence_transformers import SentenceTransformer
 import numpy as np
 from app.db.models import Meal
@@ -42,26 +43,75 @@ def get_embedder():
     return _model
 
 
+def build_diet_tags(diet_flags: dict, raw_diet_key: str | None = None) -> list[str]:
+    tags = []
+
+    raw_tags = [
+        tag.strip().replace("_", " ")
+        for tag in (raw_diet_key or "").split(",")
+        if tag.strip()
+    ]
+    tags.extend(raw_tags)
+
+    flag_map = [
+        ("is_vegan", "vegan"),
+        ("is_vegetarian", "vegetarian"),
+        ("is_plant_based", "plant based"),
+        ("is_mindful", "mindful"),
+        ("is_standard", "standard"),
+    ]
+    for key, label in flag_map:
+        if diet_flags.get(key):
+            tags.append(label)
+
+    #preserve insertion order, drop dupes
+    seen = set()
+    deduped = []
+    for tag in tags:
+        if tag and tag.lower() not in seen:
+            seen.add(tag.lower())
+            deduped.append(tag.lower())
+
+    return deduped
+
+
 def build_embedding_text(
     name: str = "",
     ingredients: str = "",
     diet_key: str = "",
     allergens: str = "",
+    nutrition_tags: list | None = None,
+    diet_tags: list | None = None,
 ) -> str:
     """Composing a richer text snippet for SBERT from available meal metadata."""
     parts = []
 
-    if name:
-        parts.append(name.strip())
-    if ingredients:
-        parts.append(ingredients.strip())
+    name_part = name.strip() if name else ""
+    if name_part:
+        parts.append(f"Name: {name_part}")
 
-    tags = [tag.strip().replace("_", " ") for tag in (diet_key or "").split(",") if tag.strip()]
-    if tags:
-        parts.append("Diet tags: " + ", ".join(sorted(tags)))
+    diet_part = ", ".join(diet_tags or []) if diet_tags else ""
+    if diet_part:
+        parts.append(f"Diet: {diet_part}")
+    else:
+        parts.append("Diet: none")
 
-    if allergens:
-        parts.append("Allergens: " + allergens.strip())
+    allergen_part = allergens.strip() if allergens else ""
+    if allergen_part:
+        parts.append(f"Allergens: {allergen_part}")
+    else:
+        parts.append("Allergens: none")
+
+    nutri_tags = [t.strip() for t in (nutrition_tags or []) if t]
+    if nutri_tags:
+        nutri_str = ", ".join(sorted(set(nutri_tags)))
+        parts.append(f"Nutrition tags: {nutri_str}")
+    else:
+        parts.append("Nutrition tags: none")
+
+    ingredients_part = ingredients.strip() if ingredients else ""
+    if ingredients_part:
+        parts.append(f"Ingredients: {ingredients_part}")
 
     return ". ".join(parts).strip()
 
@@ -155,7 +205,71 @@ def compute_allergen_count(meal: Meal) -> int:
     
     return len([a.strip() for a in meal.allergens.split(",") if a.strip()])
 
+def build_nutrition_tags(numeric_features: dict) -> list[str]:
+    """
+    Coarse discretization of nutrition for SBERT text enrichment only.
+    Does not modify numeric processing/values used by models.
+    """
+    tags: list[str] = []
 
+    calories = float(numeric_features.get("calories", 0.0) or 0.0)
+    protein = float(numeric_features.get("protein", 0.0) or 0.0)
+    sugar = float(numeric_features.get("sugar", 0.0) or 0.0)
+    sodium = float(numeric_features.get("sodium", 0.0) or 0.0)
+    fiber = float(numeric_features.get("fiber", 0.0) or 0.0)
+    fat = float(numeric_features.get("fat", 0.0) or 0.0)
+    carbs = float(numeric_features.get("carbohydrates", 0.0) or 0.0)
+
+    cal_norm = calories if calories > 1e-6 else 100.0
+    per_100_cal = lambda val: 100.0 * _safe_divide(val, cal_norm)
+
+    protein_per_100 = per_100_cal(protein)
+    sugar_per_100 = per_100_cal(sugar)
+    sodium_per_100 = per_100_cal(sodium)
+    fiber_per_100 = per_100_cal(fiber)
+    fat_per_100 = per_100_cal(fat)
+    carbs_per_100 = per_100_cal(carbs)
+
+    if protein_per_100 >= 8.0:
+        tags.append("high protein")
+    elif protein_per_100 <= 4.0:
+        tags.append("low protein")
+
+    if fiber_per_100 >= 3.0:
+        tags.append("high fiber")
+
+    if sugar_per_100 >= 10.0:
+        tags.append("high sugar")
+    elif sugar_per_100 <= 5.0:
+        tags.append("low sugar")
+
+    if sodium_per_100 >= 600.0:
+        tags.append("high sodium")
+    elif sodium_per_100 <= 300.0:
+        tags.append("low sodium")
+
+    if fat_per_100 >= 10.0:
+        tags.append("high fat")
+
+    if carbs_per_100 <= 10.0:
+        tags.append("low carb")
+
+    if calories >= 700:
+        tags.append("high calorie")
+    elif calories > 0 and calories <= 250:
+        tags.append("low calorie")
+
+    #preserve insertion order, drop dupes
+    seen = set()
+    deduped = []
+    for tag in tags:
+        if tag not in seen:
+            seen.add(tag)
+            deduped.append(tag)
+
+    return deduped
+
+    
 def embed_ingredients(text: str) -> np.ndarray:
     if not text:
         text = ""
