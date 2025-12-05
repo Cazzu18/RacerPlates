@@ -21,7 +21,12 @@
   },
   {
     "name": "sbert_fusion_mlp",
-    "accuracy": 0.39338235294117646,
-    "macro_f1": 0.37469935999347764
+    "accuracy": 0.45588235294117646,
+    "macro_f1": 0.3969344012204424
+  },
+  {
+    "name": "sbert_fusion_linear",
+    "accuracy": 0.3639705882352941,
+    "macro_f1": 0.35425537381672534
   }
 ]

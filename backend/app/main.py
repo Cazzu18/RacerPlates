@@ -5,7 +5,7 @@ from app.api import routes_menu, routes_predict, routes_health
 from app.core.config import settings 
 from app.ml.inference import preload_models
 
-# Reduce noisy tokenizers fork warnings.
+#to reduce noisy tokenizers fork warnings.
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 app = FastAPI(title="RacerPlates API", version="0.1.0")

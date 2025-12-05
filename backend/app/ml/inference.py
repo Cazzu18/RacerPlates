@@ -30,18 +30,22 @@ THIS_DIR = Path(__file__).resolve().parent
 MODELS_DIR = THIS_DIR / "models"
 FUSION_MODEL_PATH = MODELS_DIR / "sbert_fusion_mlp.joblib"
 ORACLE_MODEL_PATH = MODELS_DIR / "oracle_knn_embeddings.joblib"
+LINEAR_MODEL_PATH = MODELS_DIR / "sbert_fusion_linear.joblib"
 
 DEFAULT_MODEL_NAME = "sbert_fusion_mlp"
 MODEL_PATHS: Dict[str, Path] = {
     "sbert_fusion_mlp": FUSION_MODEL_PATH,
     "oracle_knn_embeddings": ORACLE_MODEL_PATH,
+    "sbert_fusion_linear": LINEAR_MODEL_PATH,
 }
 
-# supporting a few friendly aliases for the frontend fallbacks
+#supporting a few friendly aliases for the frontend fallbacks
 MODEL_ALIASES: Dict[str, str] = {
     "sbert_fusion_mlp": "sbert_fusion_mlp",
     "fusion": "sbert_fusion_mlp",
     "fusion_mlp": "sbert_fusion_mlp",
+    "fusion_linear": "sbert_fusion_linear",
+    "sbert_fusion_linear": "sbert_fusion_linear",
     "oracle_knn_embeddings": "oracle_knn_embeddings",
     "oracle-knn": "oracle_knn_embeddings",
     "oracle_knn": "oracle_knn_embeddings",
@@ -76,18 +80,18 @@ def _load_model(name: str):
 
 def preload_models() -> None:
     """
-    Warm up the embedder and model artifacts once at startup to avoid
+    Warmming up the embedder and model artifacts at startup to avoid
     first-request latency or device init issues.
     """
     try:
         embed_ingredients("warmup")
-    except Exception as exc:  # pragma: no cover - defensive guard
+    except Exception as exc:  #defensive guard
         logger.warning("Embedder warmup failed: %s", exc)
 
     for name in MODEL_PATHS:
         try:
             _load_model(name)
-        except Exception as exc:  # pragma: no cover - defensive guard
+        except Exception as exc:  #defensive guard
             logger.warning("Skipping preload for %s: %s", name, exc)
 
 
