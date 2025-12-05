@@ -15,6 +15,8 @@ from app.ml.features import (
     compute_numeric_features,
     compute_diet_features,
     compute_allergen_count,
+    build_nutrition_tags,
+    build_diet_tags,
     build_embedding_text,
     embed_ingredients,
 )
@@ -36,11 +38,15 @@ def build_training_dataframe():
         numeric = compute_numeric_features(meal)
         diet = compute_diet_features(meal)
         allergen_count = compute_allergen_count(meal)
+        nutrition_tags = build_nutrition_tags(numeric)
+        diet_tags = build_diet_tags(diet, meal.diet_key or "")
         full_text = build_embedding_text(
             name=meal.name or "",
             ingredients=meal.ingredients or "",
             diet_key=meal.diet_key or "",
             allergens=meal.allergens or "",
+            nutrition_tags=nutrition_tags,
+            diet_tags=diet_tags,
         )
         embed_vec = embed_ingredients(full_text)
         
